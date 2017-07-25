@@ -221,7 +221,7 @@ def load_tiny_imagenet(path, dtype=np.float32, subtract_mean=True):
 
 """Begin by loading the data"""
 
-m = 20
+m = 5
 n = 3072
 mval = 1000
 mtest = 20
@@ -254,8 +254,8 @@ Xval = np.reshape(Xval, (mval, n))  # max xtest and xval are 1000
 ###################################################################################################
 # now do some feature scaling
 
-X = X / np.max(X)
-Xval = X / np.max(Xval)
+X = X / np.max(X,axis=0,keepdims=True)
+Xval = X / np.max(Xval,axis=0,keepdims=True)
 
 # convert the ys to sparse Y matrices(one hot representation)
 Y = np.zeros((m, out_units))  # ==> m*R = m*10
@@ -272,7 +272,7 @@ print('data loaded successfully!\n')
 
 # define the activation routine
 
-epsilon = 1
+epsilon = 1e-4
 np.random.seed(int(round(time.time())))
 
 Theta1 = epsilon * np.random.randn(hid_layer1, n) / np.sqrt(hid_layer1)
@@ -324,10 +324,10 @@ def gradientCheck(func, thisVariable, h = 1e-4):
     # print(h.shape)
     return (1/((2*h)/(fprev-fnext)[:,None]))
 
-iters = 10
+iters = 2000
 losses = []
-learn_rate = 0.001
-reg = 0
+learn_rate = 1e-3
+reg = 1e-3
 cost_training = []
 cost_cross = []
 dTheta1 = 0
@@ -346,12 +346,18 @@ for k in range(iters):
     A2 = R(X, Theta1, b1)
     A3 = R(A2, Theta2, b2)
     A4 = A3.dot(Theta3.T) + b3
+
+    exp = np.exp(A4)
+    prob = exp / np.sum(exp,axis=1,keepdims=True)
+    cost = np.sum(-np.log(prob[range(m), y])) + (np.sum(Theta1**2) + np.sum(Theta2**2)
+                                           + np.sum(Theta3**2) + np.sum(b1**2) + np.sum(b2**2) + np.sum(b3**2))
+
     ###################################################################
 
     # see the loss on the prediction with current weights
 
-    cost = -1 / m * np.sum(Y * np.log(sigmoid(A4) + 1e-3) + (1 - Y) * np.log(1 - sigmoid(A4) + 1e-3)) + 1 / (2*m) * reg * \
-            (np.sum(Theta1**2) + np.sum(Theta2**2) + np.sum(Theta3**2) + np.sum(b1**2) + np.sum(b2**2) + np.sum(b3**2))
+    #cost = -1 / m * np.sum(Y * np.log(sigmoid(A4) + 1e-3) + (1 - Y) * np.log(1 - sigmoid(A4) + 1e-3)) + 1 / (2*m) * reg * \
+     #       (np.sum(Theta1**2) + np.sum(Theta2**2) + np.sum(Theta3**2) + np.sum(b1**2) + np.sum(b2**2) + np.sum(b3**2))
     cost_training.append(cost)
     #if iters == 0:
     print('iteration = ', k, 'cost = ', cost)
@@ -360,30 +366,32 @@ for k in range(iters):
     # backward pass begins here
 
     # dA4 = -1 / m * (Y * (1 - sigmoid(A4)))
+    prob[range(m),y] -= 1
+    dA4 = prob
     dA4 = A4 - Y
 
-    dA3 = dA4.dot(Theta3)
-    dTheta3 = (dA4.T).dot(A3) + reg / m * Theta3
-    db3 = np.sum(dA4, axis = 0) + reg / m * b3
+    dA3 = dA4.dot(Theta3) * (1 - np.power(A3, 2))
+    dTheta3 = (A3.T).dot(dA4) + reg / m * Theta3.T
+    db3 = np.sum(dA4, axis = 0, keepdims=True) + reg / m * b3
 
-    dA2 = (dA3 * A3 * (1 - A3)).dot(Theta2)
-    dTheta2 = ((dA3 * A3 * (1 - A3)).T).dot(A2) + reg / m * Theta2
-    db2 = np.sum(dA3, axis = 0) + reg / m * b2
+    dA2 = dA3.dot(Theta2) * (1 - np.power(A2, 2))
+    dTheta2 = A2.T.dot(dA3) + reg / m * Theta2.T
+    db2 = np.sum(dA3, axis = 0, keepdims=True) + reg / m * b2
 
-    dA1 = (dA2 * A2 * (1 - A2)).dot(Theta1)
-    dTheta1 = ((dA2 * A2 * (1 - A2)).T).dot(X) + reg / m * Theta1
-    db1 = np.sum(dA2, axis = 0) + reg / m * b1
+    #dA1 = (dA2 * A2 * (1 - A2)).dot(Theta1)
+    dTheta1 = X.T.dot(dA2) + reg / m * Theta1.T
+    db1 = np.sum(dA2, axis = 0, keepdims=True) + reg / m * b1
 
     # update the weights and the biases
-    Theta1 += -learn_rate * dA2.T.dot(X)
-    Theta2 += -learn_rate * dA3.T.dot(A2)
-    Theta3 += -learn_rate * dA4.T.dot(A3)
+    Theta1 += -learn_rate * dTheta1.T
+    Theta2 += -learn_rate * dTheta2.T
+    Theta3 += -learn_rate * dTheta3.T
 
     b1 += -learn_rate * db1
     b2 += -learn_rate * db2
     b3 += -learn_rate * db3
 
-    error = np.ndarray.argmax(Y) != A4
+    error = y != np.argmax(np.exp(A4) / np.sum(np.exp(A4),axis=1,keepdims=True),axis=1)
     error = error.sum() / float(error.size)
     print('Training error = ', error * 100, '% ', end = '')
 
@@ -393,7 +401,9 @@ for k in range(iters):
 A2 = R(X, Theta1, b1)
 A3 = R(A2, Theta2, b2)
 A4 = A3.dot(Theta3.T) + b3
-accuracy = np.mean(np.argmax(A4,axis=1) == y)
+exp = np.exp(A4)
+prob = exp / np.sum(exp, axis=1, keepdims=True)
+accuracy = np.mean(np.argmax(prob,axis=1) == y)
 # print("for ",i," examples:")
 print('Training accuracy = ', accuracy * 100, '%')
 
@@ -401,7 +411,9 @@ print('Training accuracy = ', accuracy * 100, '%')
 A2 = R(Xval, Theta1, b1)
 A3 = R(A2, Theta2, b2)
 A4 = A3.dot(Theta3.T) + b3
-accuracy = np.mean(np.argmax(A4,axis=1) == yval)
+exp = np.exp(A4)
+prob = exp / np.sum(exp, axis=1, keepdims=True)
+accuracy = np.mean(np.argmax(prob,axis=1) == y)
 print('Cross validation accuracy = ', accuracy * 100, '%\n')
 
 # plt.plot(cost_cross,'b')
