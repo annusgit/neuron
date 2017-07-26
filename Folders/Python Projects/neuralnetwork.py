@@ -8,32 +8,46 @@ np.random.seed(int(time.time()))
 k = np.tanh(np.sin(np.arange(0,10,0.01))**2)
 factor = 4 * np.max(k)
 rand_values = np.random.rand(k.shape[0])
-X = factor*(rand_values-np.mean(rand_values))
+X = np.array(factor*(rand_values-np.mean(rand_values)))
 
-pos = np.array(np.where(X >= k))
-neg = np.array(np.where(X < k))
+#pos = np.array(np.where(X >= k))
+#neg = np.array(np.where(X < k))
 
-pos_ex = np.array(X[pos])
-neg_ex = np.array(X[neg])
+#pos_ex = np.array(X[pos])
+#neg_ex = np.array(X[neg])
 
-y = np.zeros(X.shape)
-y[pos] = 1
-y[neg] = 0
+#y = np.zeros(X.shape)
+#y[pos] = 1
+#y[neg] = 0
 
-labels   = np.concatenate((y[pos].T, y[neg].T), axis=0)
-positive = np.concatenate((pos.T, pos_ex.T), axis=1)
-negative = np.concatenate((neg.T, neg_ex.T), axis=1)
+labels = np.zeros(X.shape[0])
+labels[X >= k] = 1
+
+ix = np.array(range(X.shape[0]))
+#print(X.shape, ix.shape)
+full_X = np.column_stack((ix, X))
+data = np.column_stack((full_X, labels))
+#print(full_X.shape)
+
+#labels   = np.concatenate((y[pos].T, y[neg].T), axis=0)
+#positive = np.concatenate((pos.T, pos_ex.T), axis=1)
+#negative = np.concatenate((neg.T, neg_ex.T), axis=1)
 #print(indx.shape, exam.shape)
-full_X = np.concatenate((positive, negative), axis=0)
-data = np.concatenate((full_X, y), axis = 1)
+#full_X = np.concatenate((positive, negative), axis=0)
+#data = np.concatenate((full_X, y), axis = 1)
 #print(full_X)
 
-subset = (data[:,2] == 1)
-
+#subset = (data[:,2] == 1)
 #pypl.scatter(pos, pos_ex, c='b', label='+ive examples')
 #pypl.scatter(neg, neg_ex, c='r', label='-ive examples')
-pypl.scatter(full_X[subset,0], full_X[subset,1], c='r', label='-ive examples')
 
+X = data[:,[0,1]]
+y = data[:,2]
+pos = np.array(y == 1)
+neg = np.array(y == 0)
+
+pypl.scatter(X[pos, 0], X[pos, 1], c='b', label='+ive examples')
+pypl.scatter(X[neg, 0], X[neg, 1], c='r', label='-ive examples')
 pypl.plot(k, c='g', label='true dec. bound.')
 pypl.xlabel('Training examples feature 1')
 pypl.ylabel('Training examples feature 2')
