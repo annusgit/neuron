@@ -24,6 +24,7 @@ y = data[:,2].astype('int32')
 pos = np.array(y == 1)
 neg = np.array(y == 0)
 
+pypl.figure(num=1)
 pypl.scatter(X[pos, 0], X[pos, 1], c='b', label='+ive examples')
 pypl.scatter(X[neg, 0], X[neg, 1], c='r', label='-ive examples')
 pypl.plot(k, c='g', label='true dec. bound.')
@@ -44,9 +45,10 @@ b1 = np.zeros((1,hid1_units))
 Theta2 = epsilon * np.random.randn(hid1_units,outs)
 b2 = np.zeros((1,outs))
 
-epochs = 100
+epochs = 40000
 batch_size = 100
-alpha = 1e-3
+alpha = 1e-4
+losses = []
 
 for e in range(epochs):
 
@@ -54,10 +56,10 @@ for e in range(epochs):
     A3 = A2.dot(Theta2) + b2
 
     exp_A3 = np.exp(A3)
-    # exp_A3 /= np.max(exp_A3, axis=0, keepdims=True)
     prob = exp_A3 / np.sum(exp_A3, axis=1, keepdims=True)
     loss = -1 / m * np.sum(np.log(prob[range(m), y]))
     print('epoch#', e, ' loss = ', loss)
+    losses.append(loss)
 
     dL_dA3 = prob
     dL_dA3[range(m), y] -= 1
@@ -78,8 +80,14 @@ for e in range(epochs):
     b1 += -alpha * dL_db1
 
 
+train_acc = 100 * np.mean(np.argmax(A3, axis=1) == y)
+print('Training accuracy = ', train_acc)
 
-
+pypl.figure(2)
+pypl.plot(losses, c='r')
+pypl.xlabel('iteration')
+pypl.ylabel('cost')
+pypl.show()
 
 
 
